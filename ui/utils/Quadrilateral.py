@@ -14,6 +14,15 @@ class Quadrilateral:
         self.drawing_complete: bool = False
 
     def find_close_corner(self, point: QPointF) -> int | None:
+        """
+        Finds the index of the corner in the quadrilateral that is within a certain distance from the given point.
+
+        Args:
+            point (QPointF): The point to check proximity against the quadrilateral's corners.
+
+        Returns:
+            int | None: The index of the close corner if found within CLOSE_POINT_DISTANCE, otherwise None.
+        """
         close_point_id: int | None = None
         quadrilateral_point: QPointF
         for point_id, quadrilateral_point in enumerate(self.quadrilateral_points):
@@ -23,6 +32,13 @@ class Quadrilateral:
         return close_point_id
     
     def append_point_to_quadrilateral(self, new_point: QPointF) -> int:
+        """
+        Appends a new point to the quadrilateral if drawing is not complete and the point is not too close to existing corners.
+        Args:
+            new_point (QPointF): The point to be added to the quadrilateral.
+        Returns:
+            int: -1 if the drawing is complete or the new point is too close to an existing corner; otherwise, None.
+        """
         # Check if drawing is competed
         if self.drawing_complete:
             return -1
@@ -40,6 +56,15 @@ class Quadrilateral:
             self.drawing_complete = True
     
     def update_point(self, point_id: int, new_point_value: QPointF) -> int:
+        """
+        Updates the value of a specific point in the quadrilateral.
+        Args:
+            point_id (int): The index of the point to update (must be between 0 and NB_SIDE - 1).
+            new_point_value (QPointF): The new value to assign to the specified point.
+        Returns:
+            int: 0 if the point was successfully updated, -1 if the operation failed due to
+                incomplete drawing or invalid point_id.
+        """
         # Check flags
         if not self.drawing_complete:
             return -1
@@ -53,7 +78,16 @@ class Quadrilateral:
 
         return 0
 
-    def point_in_quadrilateral(self, point: QPointF) -> bool:
+    def is_point_in_quadrilateral(self, point: QPointF) -> bool:
+        """
+        Determines whether a given point lies inside the quadrilateral defined by the object's points.
+        Uses the ray casting algorithm to check if the point is inside the quadrilateral.
+        Returns False if the quadrilateral is not fully defined (drawing not complete).
+        Args:
+            point (QPointF): The point to test for inclusion within the quadrilateral.
+        Returns:
+            bool: True if the point is inside the quadrilateral, False otherwise.
+        """
         if not self.drawing_complete:
             return False
         

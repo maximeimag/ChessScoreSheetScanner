@@ -276,6 +276,20 @@ class ImageView(QGraphicsView):
         super().mouseMoveEvent(event)
     
     def mousePressEvent(self, event: QMouseEvent):
+        """
+        Handles mouse press events for the image view, enabling navigation, drawing, and modification of quadrilaterals.
+        Depending on the current mode (`self.mode`), this method performs the following actions:
+            - NAVIGATE: No action is taken.
+            - DRAW: 
+                - On left mouse button press, starts or continues drawing a quadrilateral by adding points.
+                - Completes and stores the quadrilateral when all points are added.
+                - On right mouse button press, cancels the current quadrilateral drawing.
+            - MODIFY:
+                - On left mouse button press, selects a quadrilateral or initiates dragging of a corner point if clicked near one.
+        Updates the mouse position labels, refreshes the viewport, and calls the parent class implementation.
+        Args:
+            event (QMouseEvent): The mouse event containing information about the button pressed and cursor position.
+        """
         # Get mouse positions and update labels
         mouse_position: QPointF = self.mapToScene(event.position().toPoint())
         self.update_labels(mouse_position=mouse_position)
@@ -303,7 +317,7 @@ class ImageView(QGraphicsView):
                     
             case ImageViewMode.MODIFY:
                 if event.button() == Qt.MouseButton.LeftButton:
-                    clicked_quadrilateral_id: int | None = self.point_in_quadrilateral(point=mouse_position)
+                    clicked_quadrilateral_id: int | None = self.get_clicked_quadrilateral(point=mouse_position)
                     selected_quadrilateral: Quadrilateral | None = self.get_selected_quadrilateral()
 
                     # Select quadrilateral if no quadrilateral is selected
@@ -325,6 +339,15 @@ class ImageView(QGraphicsView):
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
+        """
+        Handles the mouse release event.
+
+        Resets the dragging point state by setting `dragging_point_id` to None,
+        and then calls the base class implementation to ensure default behavior.
+
+        Args:
+            event (QMouseEvent): The mouse release event object.
+        """
         self.dragging_point_id = None
         super().mouseReleaseEvent(event)
 
@@ -341,11 +364,21 @@ class ImageView(QGraphicsView):
             case _:
                 super().keyPressEvent(event)
 
-    def point_in_quadrilateral(self, point: QPointF) -> int | None:
+    def get_clicked_quadrilateral(self, point: QPointF) -> int | None:
+        """
+        Returns the index of the quadrilateral that contains the given point.
+        First, checks if the point is inside the currently selected quadrilateral.
+        If so, returns its index. Otherwise, iterates through all other quadrilaterals
+        and returns the index of the first one that contains the point.
+        Args:
+            point (QPointF): The point to check.
+        Returns:
+            int | None: The index of the quadrilateral containing the point, or None if none are found.
+        """
         # Check if point is in currently selected quadrilateral
         selected_quadrilateral: Quadrilateral =  self.get_selected_quadrilateral()
         if selected_quadrilateral is not None:
-            if selected_quadrilateral.point_in_quadrilateral(point):
+            if selected_quadrilateral.is_point_in_quadrilateral(point):
                 return self.selected_quadrilateral_id
             
         for i, quadrilateral in enumerate(self.quadrilaterals):
@@ -353,13 +386,26 @@ class ImageView(QGraphicsView):
             if i == self.selected_quadrilateral_id:
                 continue
 
-            if quadrilateral.point_in_quadrilateral(point):
+            if quadrilateral.is_point_in_quadrilateral(point):
                 return i
             
         return None
 
 
     def drawForeground(self, painter, rect):
+        """
+        Draws the foreground elements on the scene, including finished and unfinished quadrilaterals.
+        This method visualizes all quadrilaterals stored in `self.quadrilaterals`, highlighting the selected one,
+        and draws their corner points with different styles depending on their selection state. It also draws the
+        currently drawn (unfinished) quadrilateral, if any, with a distinct style.
+        Args:
+            painter (QPainter): The painter object used for drawing.
+            rect (QRectF): The rectangle area to be painted (not directly used in this method).
+        Visual Elements:
+            - Finished quadrilaterals: Drawn as closed polylines with corner points.
+            - Selected quadrilateral: Uses special pen and brush for highlighting.
+            - Unfinished quadrilateral: Drawn as an open polyline with distinct points.
+        """
         # Draw finished quadrilaterals
         for quadrilateral_id, quadrilateral in enumerate(self.quadrilaterals):
             quadrilateral_points: list[QPointF] = quadrilateral.quadrilateral_points
