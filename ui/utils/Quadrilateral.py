@@ -1,4 +1,3 @@
-from copy import deepcopy
 from PyQt6.QtCore import Qt, QPointF
 
 class Quadrilateral:
@@ -108,3 +107,16 @@ class Quadrilateral:
                             inside = not inside
             p1x, p1y = p2x, p2y
         return inside
+    
+    def move_delta(self, delta: QPointF) -> None:
+        """
+        Moves all points of the quadrilateral by the specified delta.
+
+        Args:
+            delta (QPointF): The amount to move each point, represented as a QPointF.
+
+        Returns:
+            None
+        """
+        for i, point in enumerate(self.quadrilateral_points):
+            self.update_point(i, point + delta)

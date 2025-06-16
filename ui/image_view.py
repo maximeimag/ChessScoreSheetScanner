@@ -68,7 +68,23 @@ class ImageView(QGraphicsView):
         self.quadrilaterals: list[Quadrilateral] = []
         self.drawing_quadrilateral: Quadrilateral | None = None
         self.selected_quadrilateral_id: int | None = None
+        self.dragging_quadrilateral: bool = False
         self.dragging_point_id: int | None = None
+        self.last_mouse_pos: QPointF | None = None
+
+    def reset_drawing_and_modification(self) -> None:
+        """
+        Resets all drawing and modification states related to quadrilaterals.
+
+        This method clears any ongoing drawing, selection, or dragging actions,
+        and resets the last recorded mouse position.
+        """
+        self.drawing_quadrilateral = None
+        self.selected_quadrilateral_id = None
+        self.dragging_point_id = None
+        self.dragging_quadrilateral = False
+        self.last_mouse_pos = None
+
     
     def reset_scene_parameters(self) -> None:
         """
@@ -82,9 +98,7 @@ class ImageView(QGraphicsView):
         self.mode = ImageViewMode.NAVIGATE
         self.scale_factor = 1.0
         self.quadrilaterals = []
-        self.drawing_quadrilateral = None
-        self.selected_quadrilateral_id = None
-        self.dragging_point_id = None
+        self.reset_drawing_and_modification()
         self.viewport().update()
         
         self.coord_label.setText("")
@@ -238,9 +252,7 @@ class ImageView(QGraphicsView):
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
         
         # Reset drawing and modification
-        self.drawing_quadrilateral = None
-        self.selected_quadrilateral_id = None
-        self.dragging_point_id = None
+        self.reset_drawing_and_modification()
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """
@@ -265,11 +277,16 @@ class ImageView(QGraphicsView):
                 pass
             case ImageViewMode.MODIFY:
                 selected_quadrilateral: Quadrilateral | None = self.get_selected_quadrilateral()
-                if selected_quadrilateral is not None and self.dragging_point_id is not None:
-                    ret = selected_quadrilateral.update_point(
-                        point_id=self.dragging_point_id,
-                        new_point_value=mouse_position
-                    )
+                if selected_quadrilateral is not None:
+                    if self.dragging_point_id is not None:
+                        selected_quadrilateral.update_point(
+                            point_id=self.dragging_point_id,
+                            new_point_value=mouse_position
+                        )
+                    elif self.dragging_quadrilateral and self.last_mouse_pos is not None:
+                        delta: QPointF = mouse_position - self.last_mouse_pos
+                        selected_quadrilateral.move_delta(delta)
+                        self.last_mouse_pos = mouse_position
                 self.viewport().update()
 
         # Call the parent class
@@ -323,14 +340,24 @@ class ImageView(QGraphicsView):
                     # Select quadrilateral if no quadrilateral is selected
                     if selected_quadrilateral is None:
                         self.selected_quadrilateral_id = clicked_quadrilateral_id
+                        self.dragging_quadrilateral = False
+                        self.last_mouse_pos = None
                     else:
                         # Check if a corner of the currently selected quadrilateral is clicked
                         corner_id: int | None = selected_quadrilateral.find_close_corner(point=mouse_position)
                         if corner_id is not None:
                             self.dragging_point_id = corner_id
+                            self.dragging_quadrilateral = False
+                            self.last_mouse_pos = None
+                        elif clicked_quadrilateral_id == self.selected_quadrilateral_id:
+                            # Start dragging the whole quadrilateral if selected quadrilateral is once again clicked
+                            self.dragging_quadrilateral = True
+                            self.last_mouse_pos = mouse_position
                         else:
-                            # Select quadrilateral if no corner is near
+                            # Change selection
                             self.selected_quadrilateral_id = clicked_quadrilateral_id
+                            self.dragging_quadrilateral = False
+                            self.last_mouse_pos = None
 
         # Update view
         self.viewport().update()
@@ -349,6 +376,8 @@ class ImageView(QGraphicsView):
             event (QMouseEvent): The mouse release event object.
         """
         self.dragging_point_id = None
+        self.dragging_quadrilateral = False
+        self.last_mouse_pos = None
         super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event):
