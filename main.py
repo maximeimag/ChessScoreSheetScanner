@@ -1,6 +1,6 @@
 import sys
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QStatusBar, QLabel, QPushButton
+from PyQt6.QtWidgets import QApplication, QMainWindow, QMenuBar, QMenu ,QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QStatusBar, QLabel, QPushButton
 from PyQt6.QtGui import QPixmap, QAction
 
 from ui.image_view import ImageView, ImageViewMode
@@ -8,18 +8,54 @@ from ui.image_view import ImageView, ImageViewMode
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        # Window initialization
         self.setWindowTitle("PyQt6 Image Annotator")
         self.resize(1200, 800)
-        self.image_view = ImageView()
-        self.coord_label = QLabel("")
-        self.zoom_label = QLabel("")
+
+        # Buttons for Image view
+        self.draw_btn: QPushButton = QPushButton("Draw")
+        self.modify_btn: QPushButton = QPushButton("Modify")
+        self.navigate_btn: QPushButton = QPushButton("Navigate")
+
+        # Labels
+        self.coord_label: QLabel = QLabel("")
+        self.zoom_label: QLabel = QLabel("")
+
+        # Image view
+        self.image_view: ImageView = ImageView()
         self.image_view.set_coord_label(self.coord_label)
         self.image_view.set_zoom_label(self.zoom_label)
+
+        # Init UI
         self.init_ui()
 
-    def init_ui(self):
-        menubar = self.menuBar()
-        file_menu = menubar.addMenu("File")
+    def init_ui(self) -> None:
+        # Init Menu Bar
+        self.init_menubar()
+
+        # Init buttons
+        button_row: QHBoxLayout = self.init_button_row()
+
+        # Layout without rulers, just the image view and coordinate label
+        central_widget = QWidget()
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.addLayout(button_row)
+        main_layout.addWidget(self.image_view)
+        main_layout.addWidget(self.coord_label)
+        main_layout.addWidget(self.zoom_label)
+        self.setCentralWidget(central_widget)
+        self.setStatusBar(QStatusBar())
+
+        # Set initial mode
+        self.set_mode(ImageViewMode.NAVIGATE)
+
+    def init_menubar(self) -> None:
+        # Menu bar initialization
+        menubar: QMenuBar = self.menuBar()
+
+        # File Menu
+        file_menu: QMenu = menubar.addMenu("File")
         open_action = QAction("Open", self)
         open_action.triggered.connect(self.open_image)
         close_action = QAction("Close", self)
@@ -27,6 +63,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(open_action)
         file_menu.addAction(close_action)
 
+        # View Menu
         view_menu = menubar.addMenu("View")
         zoom_in_action = QAction("Zoom In", self)
         zoom_in_action.triggered.connect(lambda: self.image_view.zoom_in_out(incremental_factor=self.image_view.ZOOM_IN_FACTOR))
@@ -35,11 +72,9 @@ class MainWindow(QMainWindow):
         view_menu.addAction(zoom_in_action)
         view_menu.addAction(zoom_out_action)
 
+    def init_button_row(self) -> QHBoxLayout:
         # --- Mode selection buttons (mutually exclusive) ---
         mode_row = QHBoxLayout()
-        self.draw_btn = QPushButton("Draw")
-        self.modify_btn = QPushButton("Modify")
-        self.navigate_btn = QPushButton("Navigate")
 
         for btn in (self.draw_btn, self.modify_btn, self.navigate_btn):
             btn.setCheckable(True)
@@ -50,19 +85,7 @@ class MainWindow(QMainWindow):
         self.navigate_btn.clicked.connect(lambda: self.set_mode(ImageViewMode.NAVIGATE))
         self.draw_btn.clicked.connect(lambda: self.set_mode(ImageViewMode.DRAW))
         self.modify_btn.clicked.connect(lambda: self.set_mode(ImageViewMode.MODIFY))
-
-        # Layout without rulers, just the image view and coordinate label
-        central_widget = QWidget()
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.addLayout(mode_row)
-        main_layout.addWidget(self.image_view)
-        main_layout.addWidget(self.coord_label)
-        main_layout.addWidget(self.zoom_label)
-        self.setCentralWidget(central_widget)
-        self.setStatusBar(QStatusBar())
-
-        # Set initial mode
-        self.set_mode(ImageViewMode.NAVIGATE)
+        return mode_row
 
     def set_mode(self, mode: ImageViewMode):
         # Ensure only one button is checked
@@ -94,6 +117,7 @@ class MainWindow(QMainWindow):
             return
 
         self.image_view.load_image(pixmap=pixmap)
+        self.set_mode(ImageViewMode.NAVIGATE)
 
     def close_image(self):
         self.image_view.close_image()
