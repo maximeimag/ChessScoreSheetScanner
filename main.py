@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(QStatusBar())
 
         # Set initial mode
-        self.set_mode(target_mode=ButtonRowMode.NAVIGATE)
+        self.set_mode(target_mode=ButtonRowMode.EDIT)
 
     def init_menubar(self) -> None:
         """
@@ -118,7 +118,7 @@ class MainWindow(QMainWindow):
             return
 
         self.image_view.load_image(pixmap=pixmap)
-        self.set_mode(ButtonRowMode.NAVIGATE)
+        self.set_mode(ButtonRowMode.EDIT)
 
     def close_image(self):
         """

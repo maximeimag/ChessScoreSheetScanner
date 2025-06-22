@@ -8,12 +8,10 @@ class ButtonRowMode(Enum):
 
     Attributes:
         DRAW (ButtonRowMode): Mode for drawing or creating new elements.
-        MODIFY (ButtonRowMode): Mode for modifying or editing existing elements.
-        NAVIGATE (ButtonRowMode): Mode for navigating through elements or views.
+        EDIT (ButtonRowMode): Mode for navigating, modifying or editing existing elements.
     """
     DRAW = "Draw"
-    MODIFY = "Modify"
-    NAVIGATE = "Navigate"
+    EDIT = "Edit"
 
 class ButtonRow(QHBoxLayout):
     def __init__(self, main_window, parent=None):
