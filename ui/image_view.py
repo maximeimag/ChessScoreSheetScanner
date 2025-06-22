@@ -29,22 +29,23 @@ class ImageView(QGraphicsView):
 
     def __init__(self, main_window, parent=None):
         """
-        Initializes the image annotator view.
-
+        Initializes the ImageView object with the given main window and optional parent widget.
         Args:
-            parent (QWidget, optional): The parent widget. Defaults to None.
-
+            main_window (QMainWindow): Reference to the main application window.
+            parent (QWidget, optional): Parent widget. Defaults to None.
         Attributes:
             scene (QGraphicsScene): The graphics scene for displaying items.
-            pixmap_item (QGraphicsPixmapItem | None): The current pixmap item displayed in the scene.
-            scale_factor (float): The current scale factor for zooming.
-            coord_label (QLabel | None): Label for displaying coordinates under the mouse cursor.
-            quadrilateral_points (list[QPointF]): Points of the quadrilateral currently being drawn.
-            quadrilaterals (list[list[QPointF]]): List of completed quadrilaterals, each as a list of points.
-            selected_quadrilateral (list[QPointF] | None): The currently selected quadrilateral, if any.
-            dragging_point (int | None): Index of the point being dragged, if any.
-
-        Sets up rendering hints, drag mode, mouse tracking, and initializes all relevant attributes for image annotation.
+            pixmap_item (QGraphicsPixmapItem | None): The current pixmap item displayed, if any.
+            main_window (QMainWindow): Reference to the main application window.
+            image_loaded (bool): Flag indicating if an image is loaded.
+            mode (ButtonRowMode): Current mode of the button row (e.g., EDIT).
+            scale_factor (float): Current zoom scale factor.
+            quadrilaterals (list[Quadrilateral]): List of drawn quadrilaterals.
+            drawing_quadrilateral (Quadrilateral | None): Quadrilateral currently being drawn.
+            selected_quadrilateral_id (int | None): ID of the currently selected quadrilateral.
+            dragging_quadrilateral (bool): Flag indicating if a quadrilateral is being dragged.
+            dragging_point_id (int | None): ID of the point being dragged, if any.
+            last_mouse_pos (QPointF | None): Last recorded mouse position.
         """
         super().__init__(parent)
         # Initialize scene
@@ -55,6 +56,7 @@ class ImageView(QGraphicsView):
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
         self.setMouseTracking(True)
         self.main_window: QMainWindow = main_window
+        self.image_loaded: bool = False
 
         # Scene parameters
         self.mode: ButtonRowMode = ButtonRowMode.EDIT
@@ -200,9 +202,8 @@ class ImageView(QGraphicsView):
     def load_image(self, pixmap: QPixmap) -> None:
         """
         Loads a new image into the view by adding the provided QPixmap to the scene.
-        This method first closes any previously loaded image, then creates a new QGraphicsPixmapItem
-        from the given pixmap and adds it to the scene. It also updates the scene rectangle to match
-        the dimensions of the new image.
+        Closes any previously loaded image before displaying the new one. Updates the scene rectangle
+        to match the dimensions of the new image and marks the image as loaded.
         Args:
             pixmap (QPixmap): The image to be displayed in the view.
         """
@@ -213,14 +214,15 @@ class ImageView(QGraphicsView):
         self.pixmap_item = QGraphicsPixmapItem(pixmap)
         self.scene.addItem(self.pixmap_item)
         self.setSceneRect(QRectF(pixmap.rect()))
+        self.image_loaded = True
 
     def close_image(self) -> None:
         """
-        Closes the currently displayed image by clearing the scene and resetting scene parameters.
-
-        This method removes all items from the scene and restores any scene-related settings to their default state.
+        Closes the currently loaded image by clearing the scene, updating the image_loaded flag,
+        and resetting all relevant state in the viewer.
         """
         self.scene.clear()
+        self.image_loaded = False
         self.reset_all()
 
     def zoom_in_out(self, incremental_factor: float = 1.0) -> None:
@@ -328,19 +330,24 @@ class ImageView(QGraphicsView):
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """
         Handles mouse movement events within the image view.
-        Updates the mouse position labels in the main window and manages interactive behaviors
-        depending on the current mode (DRAW or EDIT). In EDIT mode, allows for dragging and editing
-        of quadrilaterals, including moving points or the entire shape, and updates the cursor
-        appearance based on proximity to corners or hovered quadrilaterals.
+        This method updates the UI and internal state based on the current mouse position and interaction mode.
+        It performs the following actions:
+            - If no image is loaded, delegates the event to the parent class.
+            - Updates mouse position labels in the main window.
+            - In DRAW mode: (currently does nothing, placeholder for future quadrilateral preview).
+            - In EDIT mode:
+                - If a quadrilateral is selected and a corner is being dragged, updates the corner position.
+                - If the quadrilateral itself is being dragged, moves it according to the mouse delta.
+                - Otherwise, updates the cursor to indicate interactivity if hovering over a corner or the selected quadrilateral.
+            - Refreshes the viewport to reflect any changes.
+            - Calls the parent class's mouseMoveEvent for default processing.
         Args:
-            event (QMouseEvent): The mouse move event containing the current mouse position and state.
-        Side Effects:
-            - Updates labels in the main window with the current mouse position.
-            - Modifies quadrilateral geometry if dragging is in progress.
-            - Changes the cursor shape when hovering over interactive elements.
-            - Triggers a viewport update to reflect any changes.
-            - Calls the parent class's mouseMoveEvent for default handling.
+            event (QMouseEvent): The mouse move event containing the new mouse position and state.
         """
+        # Do not continue if no image is loaded
+        if not self.image_loaded:
+            return super().mouseMoveEvent(event)
+        
         # Get mouse positions and update labels
         mouse_position: QPointF = self.mapToScene(event.position().toPoint())
         self.main_window.update_labels(mouse_position=mouse_position)
@@ -383,7 +390,27 @@ class ImageView(QGraphicsView):
         # Call the parent class
         super().mouseMoveEvent(event)
     
-    def mousePressEvent(self, event: QMouseEvent):
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        """
+        Handles mouse press events for the image view.
+        Depending on the current mode (DRAW or EDIT), this method processes mouse clicks to:
+        - DRAW mode:
+            - Left click: Add points to a new or existing quadrilateral. Finalizes and adds the quadrilateral when complete.
+            - Right click: Clears the current drawing quadrilateral.
+        - EDIT mode:
+            - Left click: 
+                - If clicking on a quadrilateral corner, enables dragging of that corner.
+                - If clicking on the selected quadrilateral, enables dragging of the entire quadrilateral.
+                - If clicking elsewhere, enables scroll/drag mode.
+                - If clicking on a different quadrilateral, changes the selection.
+        Also updates mouse position labels, refreshes the view, and calls the parent class implementation.
+        Args:
+            event (QMouseEvent): The mouse press event containing information about the mouse action.
+        """
+        # Do not continue if no image is loaded
+        if not self.image_loaded:
+            return super().mouseMoveEvent(event)
+        
         # Get mouse positions and update labels
         mouse_position: QPointF = self.mapToScene(event.position().toPoint())
         self.main_window.update_labels(mouse_position=mouse_position)
@@ -436,7 +463,7 @@ class ImageView(QGraphicsView):
         # Call the parent class
         super().mousePressEvent(event)
 
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(self, event) -> None:
         """
         Handles the mouse release event.
 
@@ -449,7 +476,7 @@ class ImageView(QGraphicsView):
         self.reset_modification()
         super().mouseReleaseEvent(event)
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, event) -> None:
         """
         Handles key press events in the image view.
         If the 'Delete' or 'Backspace' key is pressed and a quadrilateral is selected,

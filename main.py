@@ -124,7 +124,15 @@ class MainWindow(QMainWindow):
         """
         Closes the currently displayed image in the image view component.
         """
+        self.reset_labels()
         self.image_view.close_image()
+
+    def reset_labels(self) -> None:
+        """
+        Clears the text of the coordinate and zoom labels by setting them to empty strings.
+        """
+        self.coord_label.setText("")
+        self.zoom_label.setText("")
 
     def update_labels(self, mouse_position: QPointF | None = None, scale_factor: float | None = None) -> None:
         """
