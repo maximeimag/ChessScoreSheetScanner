@@ -1,16 +1,11 @@
 from enum import Enum
 
-from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QLabel
+from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QMainWindow
 from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor, QWheelEvent, QMouseEvent, QCursor
 from PyQt6.QtCore import Qt, QPointF, QRectF
 
 from ui.utils.Quadrilateral import Quadrilateral
-
-class ImageViewMode(Enum):
-    NAVIGATE = 0
-    DRAW = 1
-    MODIFY = 2
-
+from ui.button_row import ButtonRowMode
 
 class ImageView(QGraphicsView):
 
@@ -32,7 +27,7 @@ class ImageView(QGraphicsView):
     PEN_SELECTED_QUADRILATERAL: QPen = QPen(QColor(0, 255, 0), 2)
     SELECTED_POINT_SIZE: int = 7
 
-    def __init__(self, parent=None):
+    def __init__(self, main_window, parent=None):
         """
         Initializes the image annotator view.
 
@@ -59,11 +54,10 @@ class ImageView(QGraphicsView):
         self.pixmap_item: QGraphicsPixmapItem |  None = None
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
         self.setMouseTracking(True)
-        self.coord_label: QLabel | None = None
-        self.zoom_label: QLabel | None = None
+        self.main_window: QMainWindow = main_window
 
         # Scene parameters
-        self.mode: ImageViewMode = ImageViewMode.NAVIGATE
+        self.mode: ButtonRowMode = ButtonRowMode.NAVIGATE
         self.scale_factor: float = 1.0
         self.quadrilaterals: list[Quadrilateral] = []
         self.drawing_quadrilateral: Quadrilateral | None = None
@@ -115,15 +109,13 @@ class ImageView(QGraphicsView):
         and zoom labels.
         """
         self.resetTransform()
-        self.mode = ImageViewMode.NAVIGATE
+        self.mode = ButtonRowMode.NAVIGATE
         self.scale_factor = 1.0
         self.quadrilaterals = []
         self.reset_drawing()
         self.set_selected_quadrilateral(quadrilateral_id=None)
         self.viewport().update()
-        
-        self.coord_label.setText("")
-        self.zoom_label.setText("100 %")
+        self.main_window.update_labels(mouse_position = None, scale_factor = 1.0)
 
     def get_nb_quadrilateral(self) -> int:
         return len(self.quadrilaterals)
@@ -155,24 +147,6 @@ class ImageView(QGraphicsView):
         self.selected_quadrilateral_id = None
 
         return 0
-
-    def set_coord_label(self, label) -> None:
-        """
-        Sets the coordinate label for the annotator.
-
-        Parameters:
-            label: The label widget or object to be used for displaying coordinates.
-        """
-        self.coord_label = label
-
-    def set_zoom_label(self, label) -> None:
-        """
-        Sets the zoom label for the annotator.
-
-        Parameters:
-            label: The label widget or object to be used for displaying zoom percentage.
-        """
-        self.zoom_label = label
 
     def load_image(self, pixmap: QPixmap) -> None:
         """
@@ -230,44 +204,27 @@ class ImageView(QGraphicsView):
                 Values greater than 1.0 zoom in, values less than 1.0 zoom out.
                 Defaults to 1.0.
         """
-        new_factor_scale: float = self.scale_factor * incremental_factor
+        new_scale_factor: float = self.scale_factor * incremental_factor
         # Update scale factor and label
-        if not self.ZOOM_LOWER_LIMIT <= new_factor_scale <= self.ZOOM_UPPER_LIMIT:
+        if not self.ZOOM_LOWER_LIMIT <= new_scale_factor <= self.ZOOM_UPPER_LIMIT:
             return
         
-        self.scale_factor = new_factor_scale
-        self.update_labels()
+        self.scale_factor = new_scale_factor
+        self.main_window.update_labels(scale_factor=new_scale_factor)
         self.scale(incremental_factor, incremental_factor)
 
-    def update_labels(self, mouse_position: QPointF | None = None) -> None:
-        """
-        Updates the coordinate and zoom labels in the UI.
-
-        If a mouse position is provided and the coordinate label exists, updates the coordinate label
-        to display the current mouse position in pixels. Always updates the zoom label to display the
-        current zoom level as a percentage.
-
-        Args:
-            mouse_position (QPointF | None, optional): The current mouse position in scene coordinates.
-                If None, the coordinate label is not updated.
-        """
-        if (self.coord_label is not None) and (mouse_position is not None):
-            self.coord_label.setText(f"{int(mouse_position.x())}, {int(mouse_position.y())} px")
-        if self.zoom_label is not None:
-            self.zoom_label.setText(f"{int(self.scale_factor * 100)} %")
-
-    def set_mode(self, mode: ImageViewMode) -> None:
+    def set_mode(self, mode: ButtonRowMode) -> None:
         """
         Sets the current interaction mode for the image view.
 
         Args:
-            mode (ImageViewMode): The mode to set for the image view. If set to
-                ImageViewMode.NAVIGATE, enables scroll hand drag mode for navigation.
+            mode (ButtonRowMode): The mode to set for the image view. If set to
+                ButtonRowMode.NAVIGATE, enables scroll hand drag mode for navigation.
                 Otherwise, disables drag mode.
 
         """
         self.mode = mode
-        if mode == ImageViewMode.NAVIGATE:
+        if mode == ButtonRowMode.NAVIGATE:
             self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
         else:
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
@@ -290,17 +247,17 @@ class ImageView(QGraphicsView):
         """
         # Get mouse positions and update labels
         mouse_position: QPointF = self.mapToScene(event.position().toPoint())
-        self.update_labels(mouse_position=mouse_position)
+        self.main_window.update_labels(mouse_position=mouse_position)
 
         match(self.mode):
-            case ImageViewMode.NAVIGATE:
+            case ButtonRowMode.NAVIGATE:
                 # Do nothing
                 pass
-            case ImageViewMode.DRAW:
+            case ButtonRowMode.DRAW:
                 # Do noting
                 # TODO : quadrilateral previsualisations
                 pass
-            case ImageViewMode.MODIFY:
+            case ButtonRowMode.MODIFY:
                 selected_quadrilateral: Quadrilateral | None = self.get_selected_quadrilateral()
                 hovered_quadrilateral_id: int | None = self.is_point_in_quadrilateral(point=mouse_position)
                 if selected_quadrilateral is not None:
@@ -342,13 +299,13 @@ class ImageView(QGraphicsView):
         """
         # Get mouse positions and update labels
         mouse_position: QPointF = self.mapToScene(event.position().toPoint())
-        self.update_labels(mouse_position=mouse_position)
+        self.main_window.update_labels(mouse_position=mouse_position)
 
         match(self.mode):
-            case ImageViewMode.NAVIGATE:
+            case ButtonRowMode.NAVIGATE:
                 # Do nothing
                 pass
-            case ImageViewMode.DRAW:
+            case ButtonRowMode.DRAW:
                 if event.button() == Qt.MouseButton.LeftButton:
                     # Create new quadrilateral if not existing
                     if self.drawing_quadrilateral is None:
@@ -365,7 +322,7 @@ class ImageView(QGraphicsView):
                 else:
                     pass
                     
-            case ImageViewMode.MODIFY:
+            case ButtonRowMode.MODIFY:
                 if event.button() == Qt.MouseButton.LeftButton:
                     clicked_quadrilateral_id: int | None = self.is_point_in_quadrilateral(point=mouse_position)
                     selected_quadrilateral: Quadrilateral | None = self.get_selected_quadrilateral()
