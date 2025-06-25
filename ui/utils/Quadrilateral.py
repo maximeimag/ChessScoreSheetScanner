@@ -3,45 +3,47 @@ from PyQt6.QtGui import QPainter, QPen, QColor
 
 class Quadrilateral:
     """
-    A class representing a quadrilateral shape for interactive graphical applications.
-    This class manages the state and behavior of a quadrilateral defined by four points.
-    It provides methods for adding and updating points, checking if a point is inside the
-    quadrilateral, moving the quadrilateral, computing its centroid, and rendering it
-    using a QPainter. The class supports both in-progress (drawing) and completed states,
-    and handles selection and visual feedback for user interaction.
-    Attributes:
-        NB_SIDE (int): Number of sides (corners) of the quadrilateral (always 4).
+    A class representing a 2D quadrilateral with interactive editing and drawing capabilities.
+    This class manages the geometric properties and interactive state of a quadrilateral defined by four points.
+    It provides methods for constructing the quadrilateral point by point, ensuring convexity, updating points,
+    testing point inclusion, moving the shape, and rendering it using Qt's QPainter.
+        NB_SIDE (int): Number of sides/corners in a quadrilateral (constant: 4).
         CLOSE_POINT_DISTANCE (int): Pixel distance threshold for detecting proximity to a corner.
-        COLOR_UNSELECTED_QUADRILATERAL_POINTS (QColor): Color for unselected quadrilateral points.
+        COLOR_UNSELECTED_QUADRILATERAL_POINTS (QColor): Color for unselected quadrilateral corner points.
         COLOR_UNSELECTED_QUADRILATERAL_ID (QColor): Color for unselected quadrilateral ID text.
         PEN_UNSELECTED_QUADRILATERAL (QPen): Pen for drawing unselected quadrilateral outline.
         UNSELECTED_POINT_SIZE (int): Size of unselected corner points.
-        COLOR_SELECTED_QUADRILATERAL_POINTS (QColor): Color for selected quadrilateral points.
+        COLOR_SELECTED_QUADRILATERAL_POINTS (QColor): Color for selected quadrilateral corner points.
         COLOR_SELECTED_QUADRILATERAL_ID (QColor): Color for selected quadrilateral ID text.
         PEN_SELECTED_QUADRILATERAL (QPen): Pen for drawing selected quadrilateral outline.
         SELECTED_POINT_SIZE (int): Size of selected corner points.
-        COLOR_DRAWING_QUADRILATERAL_POINTS (QColor): Color for points while drawing.
-        PEN_DRAWING_QUADRILATERAL (QPen): Pen for drawing in-progress quadrilateral.
-        DRAWING_POINT_SIZE (int): Size of points while drawing.
+        COLOR_DRAWING_QUADRILATERAL_POINTS (QColor): Color for corner points while drawing.
+        PEN_DRAWING_QUADRILATERAL (QPen): Pen for drawing the quadrilateral in progress.
+        DRAWING_POINT_SIZE (int): Size of corner points while drawing.
     Instance Attributes:
-        quadrilateral_points (list[QPointF]): List of QPointF objects representing the corners.
-        drawing_complete (bool): True if the quadrilateral has four points and is complete.
-        is_selected (bool): True if the quadrilateral is currently selected.
-        quadrilateral_id (int | None): Optional identifier for the quadrilateral.
+        quadrilateral_points (list[QPointF]): List of QPointF objects defining the quadrilateral corners.
+        drawing_complete (bool): True if the quadrilateral has four points and is finalized.
+        is_selected (bool): True if the quadrilateral is currently selected in the UI.
     Methods:
+        __init__():
+            Initializes a new Quadrilateral with default state.
         find_close_corner(point: QPointF) -> int | None:
             Returns the index of a corner close to the given point, or None if none are close.
+        is_convex(points: list[QPointF]) -> bool:
+            Static method to check if a list of four points forms a convex quadrilateral.
         append_point_to_quadrilateral(new_point: QPointF) -> int:
-            Adds a new point if drawing is not complete and the point is not too close to existing corners.
+            Attempts to add a new point to the quadrilateral, enforcing proximity and convexity constraints.
         update_point(point_id: int, new_point_value: QPointF) -> int:
-            Updates the value of a specific corner point.
+            Updates the position of a specified corner, ensuring the quadrilateral remains convex.
         is_point_in_quadrilateral(point: QPointF) -> bool:
             Determines if a given point lies inside the quadrilateral using the ray casting algorithm.
         move_delta(delta: QPointF) -> None:
+            Moves all corners of the quadrilateral by the specified delta.
         get_centroid() -> QPointF | None:
-            Calculates and returns the centroid of the quadrilateral.
+            Calculates and returns the centroid of the quadrilateral if it is complete.
         drawForeground(painter: QPainter, rect: QRectF):
-            Draws the quadrilateral and its control points using the provided QPainter.
+            Renders the quadrilateral and its control points using the provided QPainter, with different
+            styles for selected, unselected, and in-progress states.
     """
 
     NB_SIDE: int = 4 
@@ -97,14 +99,44 @@ class Quadrilateral:
                 close_point_id = point_id
                 break
         return close_point_id
+
+    @staticmethod
+    def is_convex(points: list[QPointF]) -> bool:
+        """
+        Checks if the given list of 4 points forms a convex quadrilateral.
+        Args:
+            points (list[QPointF]): List of 4 points.
+        Returns:
+            bool: True if convex, False otherwise.
+        """
+        # Check length
+        if len(points) != 4:
+            return False
+        # 2D cross product
+        def cross(a, b, c):
+            abx, aby = b.x() - a.x(), b.y() - a.y()
+            bcx, bcy = c.x() - b.x(), c.y() - b.y()
+            return abx * bcy - aby * bcx
+        # Check if cross product are all negative or all positive
+        signs = []
+        for i in range(4):
+            z = cross(points[i], points[(i+1)%4], points[(i+2)%4])
+            signs.append(z > 0)
+        return all(signs) or not any(signs)
     
     def append_point_to_quadrilateral(self, new_point: QPointF) -> int:
         """
-        Appends a new point to the quadrilateral if drawing is not complete and the point is not too close to existing corners.
+        Attempts to append a new point to the quadrilateral being constructed.
+        This method checks several conditions before adding the new point:
+        - If the quadrilateral drawing is already complete, the point is not added.
+        - If the new point is too close to any existing corner, it is not added.
+        - If adding the new point as the fourth corner would result in a non-convex quadrilateral, it is not added.
+        If the point is successfully added and the quadrilateral now has the required number of sides,
+        the drawing is marked as complete.
         Args:
             new_point (QPointF): The point to be added to the quadrilateral.
         Returns:
-            int: -1 if the drawing is complete or the new point is too close to an existing corner; otherwise, None.
+            int: 0 if the point was successfully added, -1 otherwise.
         """
         # Check if drawing is competed
         if self.drawing_complete:
@@ -115,22 +147,30 @@ class Quadrilateral:
         if close_point_id is not None:
             return -1
 
+        # Check convexity if this is the 4th point
+        temp_points = self.quadrilateral_points + [new_point]
+        if len(temp_points) == self.NB_SIDE:
+            if not self.is_convex(temp_points):
+                return -1
+
         # Add point
         self.quadrilateral_points.append(new_point)
 
-        # Raise flag if enough points are in the list
+        # Raise drawing complete flag if enough points are in the list
         if len(self.quadrilateral_points) == self.NB_SIDE:
             self.drawing_complete = True
+        
+        return 0
     
     def update_point(self, point_id: int, new_point_value: QPointF) -> int:
         """
-        Updates the value of a specific point in the quadrilateral.
+        Updates the position of a specified point in the quadrilateral if the update maintains convexity.
         Args:
-            point_id (int): The index of the point to update (must be between 0 and NB_SIDE - 1).
-            new_point_value (QPointF): The new value to assign to the specified point.
+            point_id (int): The index of the point to update (must be within valid range).
+            new_point_value (QPointF): The new position for the specified point.
         Returns:
-            int: 0 if the point was successfully updated, -1 if the operation failed due to
-                incomplete drawing or invalid point_id.
+            int: 0 if the point was successfully updated;
+                 -1 if the update was not performed due to incomplete drawing, invalid point index, or resulting in a non-convex quadrilateral.
         """
         # Check flags
         if not self.drawing_complete:
@@ -138,6 +178,12 @@ class Quadrilateral:
         
         # Check point id value
         if not 0 <= point_id < self.NB_SIDE:
+            return -1
+
+        # Check convexity before updating
+        temp_points = self.quadrilateral_points.copy()
+        temp_points[point_id] = new_point_value
+        if not self.is_convex(temp_points):
             return -1
         
         # Modify point
