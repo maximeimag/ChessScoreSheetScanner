@@ -8,109 +8,175 @@ from ui.utils.Quadrilateral import Quadrilateral
 from ui.button_row import ButtonRowMode
 
 class ImageView(QGraphicsView):
-
+    """
+    ImageView is a custom QGraphicsView subclass for displaying and interacting with images and annotated quadrilaterals.
+    This class provides a graphical interface for loading images, drawing and editing quadrilaterals, and handling user interactions such as mouse and keyboard events. It supports two primary modes: DRAW (for creating new quadrilaterals) and EDIT (for selecting and modifying existing quadrilaterals). The view supports zooming, panning, and visual feedback for selection and editing actions.
+    Attributes:
+        ZOOM_LOWER_LIMIT (float): Minimum allowed zoom scale.
+        ZOOM_UPPER_LIMIT (float): Maximum allowed zoom scale.
+        ZOOM_IN_FACTOR (float): Factor by which to zoom in.
+        ZOOM_OUT_FACTOR (float): Factor by which to zoom out.
+        main_window (QMainWindow): Reference to the main application window.
+        scene (QGraphicsScene): The graphics scene for displaying items.
+        pixmap_item (QGraphicsPixmapItem | None): The currently loaded image item.
+        image_loaded (bool): Flag indicating if an image is loaded.
+        mode (ButtonRowMode): Current interaction mode (DRAW or EDIT).
+        scale_factor (float): Current zoom scale factor.
+        quadrilaterals (list[Quadrilateral]): List of annotated quadrilaterals.
+        drawing_quadrilateral (Quadrilateral | None): The quadrilateral currently being drawn.
+        selected_quadrilateral_id (int | None): Index of the currently selected quadrilateral.
+        dragging_quadrilateral (bool): Flag indicating if a quadrilateral is being dragged.
+        dragging_point_id (int | None): Index of the corner point being dragged.
+        last_mouse_pos (QPointF | None): Last recorded mouse position.
+    Methods:
+        reset_edit(): Resets selection and editing state.
+        reset_drawing_and_edit(): Resets drawing and editing state.
+        reset_all(): Resets the entire view to its initial state.
+        get_nb_quadrilateral() -> int: Returns the number of quadrilaterals.
+        delete_selected_quadrilateral() -> int: Deletes the currently selected quadrilateral.
+        delete_quadrilateral(quadrilateral_id: int) -> int: Deletes a quadrilateral by its ID.
+        update_quadrilateral_ids(): Updates the IDs of all quadrilaterals.
+        add_drawing_quadrilateral() -> int: Adds the currently drawn quadrilateral to the list.
+        set_selected_quadrilateral(quadrilateral_id: int | None): Sets the selected quadrilateral.
+        unselect_all(): Deselects all quadrilaterals.
+        get_selected_quadrilateral() -> Quadrilateral | None: Gets the currently selected quadrilateral.
+        load_image(pixmap: QPixmap): Loads an image into the view.
+        close_image(): Closes the currently loaded image and resets the view.
+        zoom_in_out(incremental_factor: float = 1.0): Zooms the view in or out.
+        is_point_in_quadrilateral(point: QPointF) -> int | None: Checks if a point is inside any quadrilateral.
+        get_selected_quadrilateral_close_corner(point: QPointF) -> int | None: Finds the closest corner of the selected quadrilateral to a point.
+        set_mode(target_mode: ButtonRowMode): Sets the interaction mode.
+        wheelEvent(event: QWheelEvent): Handles mouse wheel events for zooming.
+        on_settings_changed(): Updates the view when settings change.
+        mouseMoveEvent(event: QMouseEvent): Handles mouse movement events.
+        mousePressEvent(event: QMouseEvent): Handles mouse press events.
+        mouseReleaseEvent(event): Handles mouse release events.
+        keyPressEvent(event): Handles key press events.
+        drawForeground(painter: QPainter, rect: QRectF): Draws quadrilaterals and overlays in the foreground.
+    Usage:
+        Instantiate ImageView within a PyQt application, providing a reference to the main window.
+        Use the provided methods to load images, draw, select, and edit quadrilaterals, and handle user interactions.
+    """
     ZOOM_LOWER_LIMIT: float = 0.2
     ZOOM_UPPER_LIMIT: float = 5.0
 
     ZOOM_IN_FACTOR: float = 1.05
     ZOOM_OUT_FACTOR: float = 1.0 / ZOOM_IN_FACTOR
 
-    COLOR_UNSELECTED_QUADRILATERAL_POINTS: QColor = QColor(255, 255, 255)
-    PEN_UNSELECTED_QUADRILATERAL: QPen = QPen(QColor(255, 0, 0), 2)
-    UNSELECTED_POINT_SIZE: int = 5
-
-    COLOR_DRAWING_QUADRILATERAL_POINTS: QColor = QColor(0, 0, 255)
-    PEN_DRAWING_QUADRILATERAL: QPen = QPen(QColor(0, 0, 255), 2, Qt.PenStyle.DashLine)
-    DRAWING_POINT_SIZE: int = 7
-
-    COLOR_SELECTED_QUADRILATERAL_POINTS: QColor = QColor(0, 255, 0)
-    PEN_SELECTED_QUADRILATERAL: QPen = QPen(QColor(0, 255, 0), 2)
-    SELECTED_POINT_SIZE: int = 7
-
     def __init__(self, main_window, parent=None):
         """
-        Initializes the ImageView object with the given main window and optional parent widget.
+        Initializes the ImageView widget with the given main window and optional parent.
         Args:
             main_window (QMainWindow): Reference to the main application window.
             parent (QWidget, optional): Parent widget. Defaults to None.
         Attributes:
+            main_window (QMainWindow): Reference to the main application window.
             scene (QGraphicsScene): The graphics scene for displaying items.
             pixmap_item (QGraphicsPixmapItem | None): The current pixmap item displayed, if any.
-            main_window (QMainWindow): Reference to the main application window.
-            image_loaded (bool): Flag indicating if an image is loaded.
-            mode (ButtonRowMode): Current mode of the button row (e.g., EDIT).
-            scale_factor (float): Current zoom scale factor.
+            image_loaded (bool): Indicates whether an image is loaded.
+            mode (ButtonRowMode): Current mode of the scene (e.g., edit mode).
+            scale_factor (float): Current scale factor for zooming.
             quadrilaterals (list[Quadrilateral]): List of drawn quadrilaterals.
-            drawing_quadrilateral (Quadrilateral | None): Quadrilateral currently being drawn.
-            selected_quadrilateral_id (int | None): ID of the currently selected quadrilateral.
-            dragging_quadrilateral (bool): Flag indicating if a quadrilateral is being dragged.
+            drawing_quadrilateral (Quadrilateral | None): Quadrilateral currently being drawn, if any.
+            selected_quadrilateral_id (int | None): ID of the currently selected quadrilateral, if any.
+            dragging_quadrilateral (bool): Whether a quadrilateral is being dragged.
             dragging_point_id (int | None): ID of the point being dragged, if any.
             last_mouse_pos (QPointF | None): Last recorded mouse position.
         """
         super().__init__(parent)
-        # Initialize scene
-        self.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.scene: QGraphicsScene = QGraphicsScene(self)
-        self.setScene(self.scene)
-        self.pixmap_item: QGraphicsPixmapItem |  None = None
-        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
-        self.setMouseTracking(True)
+        # Main window
         self.main_window: QMainWindow = main_window
+
+        # Initialize scene
+        self.scene: QGraphicsScene = QGraphicsScene(self)
+        self.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.setMouseTracking(True)
+        self.setScene(self.scene)
+
+        # Pixel map
+        self.pixmap_item: QGraphicsPixmapItem |  None = None
         self.image_loaded: bool = False
 
-        # Scene parameters
+        # Scene mode
         self.mode: ButtonRowMode = ButtonRowMode.EDIT
+
+        # Display
         self.scale_factor: float = 1.0
         self.quadrilaterals: list[Quadrilateral] = []
+        self.resetTransform()
+
+        # Drawing
         self.drawing_quadrilateral: Quadrilateral | None = None
+
+        # Selection and modification
         self.selected_quadrilateral_id: int | None = None
         self.dragging_quadrilateral: bool = False
         self.dragging_point_id: int | None = None
         self.last_mouse_pos: QPointF | None = None
 
-    def reset_drawing(self) -> None:
-        """
-        Resets the current drawing quadrilateral to None.
-
-        This method clears any existing quadrilateral selection or drawing state,
-        effectively resetting the drawing overlay in the image view.
-        """
-        self.drawing_quadrilateral = None
-
-    def reset_modification(self) -> None:
-        """
-        Resets the modification state of the image view.
-
-        This method clears any ongoing dragging operations, including point dragging,
-        quadrilateral dragging, and the last recorded mouse position.
-        """
+        # Cursor and Drag initialization
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
         self.unsetCursor()
-        self.dragging_point_id = None
+
+        # Update view
+        self.viewport().update()
+
+    def reset_edit(self) -> None:
+        """
+        Resets the editing state of the image view.
+        This method clears any current selections, disables dragging operations,
+        resets the cursor to its default state, and updates the viewport to reflect
+        these changes.
+        """
+        # Reset selection and modification
+        self.unselect_all()
         self.dragging_quadrilateral = False
+        self.dragging_point_id = None
         self.last_mouse_pos = None
+
+        # Reset cursor and Drag initialization
+        self.setDragMode(QGraphicsView.DragMode.NoDrag)
+        self.unsetCursor()
+
+        # Update view
+        self.viewport().update()
+
+    def reset_drawing_and_edit(self) -> None:
+        """
+        Resets the current drawing and editing states.
+        This method clears any ongoing quadrilateral drawing operation and resets the edit state
+        by calling the `reset_edit` method.
+        """
+        # Reset drawing
+        self.drawing_quadrilateral = None
+
+        # Reset edit
+        self.reset_edit()
  
     def reset_all(self) -> None:
         """
-        Resets the image view to its initial state.
-
-        This method performs the following actions:
-            - Resets the view transformation to default.
-            - Sets the interaction mode to navigation.
-            - Resets the scale factor to 1.0.
-            - Clears all drawn quadrilaterals.
-            - Resets any ongoing drawing or modification actions.
-            - Deselects any selected quadrilateral.
-            - Updates the viewport and main window labels to reflect the reset state.
+        Resets the state of the image view to its default values.
+        This includes:
+            - Setting the main window mode to EDIT.
+            - Resetting the display scale factor and clearing any quadrilaterals.
+            - Resetting the transformation applied to the view.
+            - Resetting drawing and editing states.
+            - Updating the main window labels to reflect the reset state.
+        Returns:
+            None
         """
+        # Reset scene mode
+        self.main_window.set_mode(ButtonRowMode.EDIT)
+
+        # Reset display
+        self.scale_factor: float = 1.0
+        self.quadrilaterals: list[Quadrilateral] = []
         self.resetTransform()
-        self.mode = ButtonRowMode.EDIT
-        self.scale_factor = 1.0
-        self.quadrilaterals = []
-        self.reset_drawing()
-        self.reset_modification()
-        self.set_selected_quadrilateral(quadrilateral_id=None)
-        self.viewport().update()
+
+        # Reset drawing and edit
+        self.reset_drawing_and_edit()
+
+        # Reset labels
         self.main_window.update_labels(mouse_position = None, scale_factor = 1.0)
 
     def get_nb_quadrilateral(self) -> int:
@@ -152,10 +218,24 @@ class ImageView(QGraphicsView):
         
         # Deletion
         del self.quadrilaterals[quadrilateral_id]
+
+        # Update ids
+        self.update_quadrilateral_ids()
+
         # Clear selection
-        self.selected_quadrilateral_id = None
+        self.unselect_all()
 
         return 0
+    
+    def update_quadrilateral_ids(self) -> None:
+        """
+        Updates the 'quadrilateral_id' attribute for each quadrilateral in the 'quadrilaterals' list.
+
+        Iterates through all quadrilaterals and assigns each one a unique ID based on its position in the list.
+        This ensures that the 'quadrilateral_id' attribute is synchronized with the current order of the quadrilaterals.
+        """
+        for quadrilateral_id, quadrilateral in enumerate(self.quadrilaterals):
+            quadrilateral.quadrilateral_id = quadrilateral_id
     
     def add_drawing_quadrilateral(self) -> int:
         """
@@ -166,6 +246,7 @@ class ImageView(QGraphicsView):
         """
         if self.drawing_quadrilateral is not None:
             self.quadrilaterals.append(self.drawing_quadrilateral)
+            self.update_quadrilateral_ids()
         else:
             return -1
         self.drawing_quadrilateral = None
@@ -173,16 +254,35 @@ class ImageView(QGraphicsView):
 
     def set_selected_quadrilateral(self, quadrilateral_id: int | None) -> None:
         """
-        Sets the currently selected quadrilateral by its ID.
+        Sets the selected quadrilateral by its ID.
 
-        Resets any ongoing modifications before updating the selected quadrilateral.
-        If `quadrilateral_id` is None, deselects any currently selected quadrilateral.
+        If the provided quadrilateral_id is None or out of valid range, all quadrilaterals are unselected.
+        Otherwise, marks the quadrilateral with the given ID as selected and unselects all others.
 
         Args:
-            quadrilateral_id (int | None): The ID of the quadrilateral to select, or None to deselect.
+            quadrilateral_id (int | None): The ID of the quadrilateral to select, or None to unselect all.
+
+        Returns:
+            None
         """
-        self.reset_modification()
-        self.selected_quadrilateral_id = quadrilateral_id
+        # Check id value
+        if quadrilateral_id is None:
+            self.unselect_all()
+        elif not 0 <= quadrilateral_id < self.get_nb_quadrilateral():
+            self.unselect_all()
+        else:
+            self.selected_quadrilateral_id = quadrilateral_id
+            for id, quadrilateral in enumerate(self.quadrilaterals):
+                quadrilateral.is_selected = id == quadrilateral_id
+    
+    def unselect_all(self):
+        """
+        Deselects all quadrilaterals by setting their 'is_selected' attribute to False
+        and clears the currently selected quadrilateral ID.
+        """
+        self.selected_quadrilateral_id = None
+        for quadrilateral in self.quadrilaterals:
+            quadrilateral.is_selected = False
       
     def get_selected_quadrilateral(self) -> Quadrilateral | None:
         """
@@ -192,9 +292,6 @@ class ImageView(QGraphicsView):
             otherwise None.
         """
         if self.selected_quadrilateral_id is None:
-            return None
-        
-        if not 0 <= self.selected_quadrilateral_id < self.get_nb_quadrilateral():
             return None
         
         return self.quadrilaterals[self.selected_quadrilateral_id]
@@ -290,7 +387,7 @@ class ImageView(QGraphicsView):
         return close_corner
 
 
-    def set_mode(self, mode: ButtonRowMode) -> None:
+    def set_mode(self, target_mode: ButtonRowMode) -> None:
         """
         Sets the current mode of the image view and resets relevant state.
         Args:
@@ -302,11 +399,11 @@ class ImageView(QGraphicsView):
             - Triggers a viewport update to reflect changes.
         """
         # Set mode
-        self.mode = mode
+        self.mode = target_mode
         
         # Reset drawing and modification
-        self.reset_drawing()
-        self.set_selected_quadrilateral(quadrilateral_id=None)
+        self.reset_drawing_and_edit()
+        self.unselect_all()
 
         # Update view
         self.viewport().update()
@@ -326,6 +423,10 @@ class ImageView(QGraphicsView):
             self.zoom_in_out(incremental_factor = self.ZOOM_IN_FACTOR)
         elif event.angleDelta().y() < 0:
             self.zoom_in_out(incremental_factor = self.ZOOM_OUT_FACTOR)
+
+    def on_settings_changed(self) -> None:
+        # Update view
+        self.viewport().update()
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """
@@ -428,7 +529,7 @@ class ImageView(QGraphicsView):
                         self.add_drawing_quadrilateral()
                 elif event.button() == Qt.MouseButton.RightButton:
                     # Clear drawing quadrilateral is right button is clicked
-                    self.reset_drawing()
+                    self.reset_drawing_and_edit()
                 else:
                     pass
                     
@@ -473,7 +574,9 @@ class ImageView(QGraphicsView):
         Args:
             event (QMouseEvent): The mouse release event object.
         """
-        self.reset_modification()
+        self.dragging_quadrilateral = False
+        self.dragging_point_id = None
+        self.last_mouse_pos = None
         super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event) -> None:
@@ -489,7 +592,7 @@ class ImageView(QGraphicsView):
             case _:
                 super().keyPressEvent(event)
 
-    def drawForeground(self, painter, rect):
+    def drawForeground(self, painter: QPainter, rect: QRectF):
         """
         Draws the foreground elements on the scene, including finished and unfinished quadrilaterals.
         This method visualizes all quadrilaterals stored in `self.quadrilaterals`, highlighting the selected one,
@@ -504,32 +607,9 @@ class ImageView(QGraphicsView):
             - Unfinished quadrilateral: Drawn as an open polyline with distinct points.
         """
         # Draw finished quadrilaterals
-        for quadrilateral_id, quadrilateral in enumerate(self.quadrilaterals):
-            quadrilateral_points: list[QPointF] = quadrilateral.quadrilateral_points
-
-            # Set pen and brush
-            if quadrilateral_id == self.selected_quadrilateral_id:
-                ellipse_size: int = self.SELECTED_POINT_SIZE
-                painter.setBrush(self.COLOR_SELECTED_QUADRILATERAL_POINTS)
-                painter.setPen(self.PEN_SELECTED_QUADRILATERAL)
-            else:
-                ellipse_size: int = self.UNSELECTED_POINT_SIZE
-                painter.setBrush(self.COLOR_UNSELECTED_QUADRILATERAL_POINTS)
-                painter.setPen(self.PEN_UNSELECTED_QUADRILATERAL)
-
-            # Draw quadrilateral and points
-            painter.drawPolyline(quadrilateral_points + [quadrilateral_points[0]])
-            for point in quadrilateral_points:
-                painter.drawEllipse(point, ellipse_size, ellipse_size)
-        
+        for quadrilateral in self.quadrilaterals:
+            quadrilateral.drawForeground(painter, rect)
         
         # Draw unfinished quadrilateral
         if self.drawing_quadrilateral is not None:
-            quadrilateral_points = self.drawing_quadrilateral.quadrilateral_points
-
-            painter.setPen(self.PEN_DRAWING_QUADRILATERAL)
-            painter.setBrush(self.COLOR_DRAWING_QUADRILATERAL_POINTS)
-
-            painter.drawPolyline(quadrilateral_points)
-            for pt in quadrilateral_points:
-                painter.drawEllipse(pt, self.DRAWING_POINT_SIZE, self.DRAWING_POINT_SIZE)
+            self.drawing_quadrilateral.drawForeground(painter, rect)

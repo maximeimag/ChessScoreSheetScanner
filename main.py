@@ -1,25 +1,54 @@
+import os
 import sys
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QMenuBar, QMenu ,QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QStatusBar, QLabel, QPushButton
+from PyQt6.QtWidgets import QApplication, QMainWindow, QMenuBar, QMenu ,QFileDialog, QVBoxLayout, QWidget, QStatusBar, QLabel
 from PyQt6.QtGui import QPixmap, QAction
 from PyQt6.QtCore import QPointF
 
 from ui.image_view import ImageView
 from ui.button_row import ButtonRow, ButtonRowMode
+from ui.settings_row import SettingsRow
 
 class MainWindow(QMainWindow):
+    """
+    MainWindow is the primary window class for the PyQt6 Image Annotator application.
+    This class manages the main user interface, including the menu bar, image view, 
+    settings and button rows, coordinate and zoom labels, and status bar. It provides 
+    methods for initializing and updating the UI, handling image loading and closing, 
+    switching interaction modes, and responding to user actions such as zooming and 
+    settings changes.
+    Attributes:
+        settings_row (SettingsRow): The row containing settings controls for the application.
+        button_row (ButtonRow): The row containing image control buttons.
+        coord_label (QLabel): Label displaying the current mouse coordinates over the image.
+        zoom_label (QLabel): Label displaying the current zoom level.
+        image_view (ImageView): The widget responsible for displaying and interacting with the image.
+    Methods:
+        __init__(): Initializes the main window and its components.
+        init_ui(): Sets up the layout, menu bar, and main UI elements.
+        init_menubar(): Configures the menu bar with File and View menus and their actions.
+        set_mode(target_mode): Sets the current interaction mode and updates UI accordingly.
+        open_image(): Opens a file dialog to load and display an image.
+        close_image(): Closes the currently displayed image and resets labels.
+        reset_labels(): Clears the coordinate and zoom labels.
+        update_labels(mouse_position, scale_factor): Updates the coordinate and zoom labels.
+        on_settings_changed(): Handles updates when application settings are changed.
+    """
     def __init__(self):
         """
         Initializes the main window for the PyQt6 Image Annotator application.
-        Sets up the window title and size, creates the button row for image controls,
-        initializes coordinate and zoom labels, and sets up the image view area.
-        Finally, calls the method to initialize the rest of the UI components.
+        Sets up the window title and size, initializes the settings and button rows,
+        creates labels for coordinates and zoom level, and sets up the image view.
+        Finally, calls the method to initialize the user interface.
         """
         super().__init__()
 
         # Window initialization
         self.setWindowTitle("PyQt6 Image Annotator")
         self.resize(1200, 800)
+
+        # Quadrilateral settings
+        self.settings_row: SettingsRow = SettingsRow(main_window=self)
 
         # Buttons for Image view
         self.button_row: ButtonRow = ButtonRow(main_window=self)
@@ -48,6 +77,7 @@ class MainWindow(QMainWindow):
         # Layout without rulers, just the image view and coordinate label
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
+        main_layout.addLayout(self.settings_row)
         main_layout.addLayout(self.button_row)
         main_layout.addWidget(self.image_view)
         main_layout.addWidget(self.coord_label)
@@ -98,7 +128,7 @@ class MainWindow(QMainWindow):
         self.button_row.check_button(target_mode=target_mode)
 
         # Pass mode to image_view
-        self.image_view.set_mode(target_mode)
+        self.image_view.set_mode(target_mode=target_mode)
 
     def open_image(self) -> None:
         """
@@ -109,7 +139,11 @@ class MainWindow(QMainWindow):
         # Ask user for an image file
         file_path: str
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Images (*.png *.jpg *.bmp)")
+
+        # Check file_path
         if file_path is None:
+            return
+        if not os.path.exists(file_path):
             return
         
         # Load image to a pixmap
@@ -151,6 +185,12 @@ class MainWindow(QMainWindow):
             self.coord_label.setText(f"{int(mouse_position.x())}, {int(mouse_position.y())} px")
         if scale_factor is not None:
             self.zoom_label.setText(f"{int(scale_factor * 100)} %")
+    
+    def on_settings_changed(self):
+        """
+        Handles updates when settings are changed by delegating the update to the image view component.
+        """
+        self.image_view.on_settings_changed()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
