@@ -247,6 +247,7 @@ class ImageView(QGraphicsView):
         if self.drawing_quadrilateral is not None:
             self.quadrilaterals.append(self.drawing_quadrilateral)
             self.update_quadrilateral_ids()
+            self.main_window.set_mode(ButtonRowMode.EDIT)
         else:
             return -1
         self.drawing_quadrilateral = None

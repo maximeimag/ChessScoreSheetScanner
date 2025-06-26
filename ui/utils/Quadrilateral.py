@@ -165,8 +165,8 @@ class Quadrilateral:
 
         # Raise drawing complete flag if enough points are in the list
         if len(self.quadrilateral_points) == self.NB_SIDE:
-            self.update_corner_ids()
             self.drawing_complete = True
+            self.update_corner_ids()
         
         return 0
     
