@@ -425,6 +425,9 @@ class ImageView(QGraphicsView):
             self.zoom_in_out(incremental_factor = self.ZOOM_OUT_FACTOR)
 
     def on_settings_changed(self) -> None:
+        """
+        Called when the settings are changed. Triggers an update of the viewport to reflect the new settings.
+        """
         # Update view
         self.viewport().update()
 
@@ -606,9 +609,20 @@ class ImageView(QGraphicsView):
             - Selected quadrilateral: Uses special pen and brush for highlighting.
             - Unfinished quadrilateral: Drawn as an open polyline with distinct points.
         """
+        # Get grid settings from main window
+        draw_cells: bool = self.main_window.settings_row.is_display_on()
+        nb_internal_rows: int = self.main_window.settings_row.get_nb_quadrilateral_rows()
+        nb_internal_cols: int = self.main_window.settings_row.get_nb_quadrilateral_cols()
+
         # Draw finished quadrilaterals
         for quadrilateral in self.quadrilaterals:
-            quadrilateral.drawForeground(painter, rect)
+            quadrilateral.drawForeground(
+                painter,
+                rect,
+                draw_cells=draw_cells,
+                nb_internal_rows=nb_internal_rows,
+                nb_internal_cols=nb_internal_cols
+            )
         
         # Draw unfinished quadrilateral
         if self.drawing_quadrilateral is not None:
