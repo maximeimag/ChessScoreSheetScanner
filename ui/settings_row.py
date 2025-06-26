@@ -8,8 +8,6 @@ class SettingsRow(QHBoxLayout):
         parent (QWidget, optional): The parent widget for this layout. Defaults to None.
     Attributes:
         main_window (QMainWindow): Reference to the main application window.
-        max_label (QLabel): Label for the maximum number of quadrilaterals setting.
-        max_spin (QSpinBox): Spin box to select the maximum number of quadrilaterals.
         rows_label (QLabel): Label for the number of rows setting.
         rows_spin (QSpinBox): Spin box to select the number of rows.
         cols_label (QLabel): Label for the number of columns setting.
@@ -18,8 +16,6 @@ class SettingsRow(QHBoxLayout):
     Methods:
         on_settings_changed():
             Notifies the main window that a setting has changed.
-        get_nb_max_quadrilateral() -> int:
-            Returns the current value for the maximum number of quadrilaterals.
         get_nb_quadrilateral_rows() -> int:
             Returns the current value for the number of quadrilateral rows.
         get_nb_quadrilateral_cols() -> int:
@@ -35,8 +31,6 @@ class SettingsRow(QHBoxLayout):
             parent (QWidget, optional): The parent widget of this settings row. Defaults to None.
         Attributes:
             main_window (QMainWindow): Reference to the main application window.
-            max_label (QLabel): Label for the maximum number of quadrilaterals setting.
-            max_spin (QSpinBox): Spin box to select the maximum number of quadrilaterals (1-100, default 3).
             rows_label (QLabel): Label for the number of rows setting.
             rows_spin (QSpinBox): Spin box to select the number of rows (1-100, default 40).
             cols_label (QLabel): Label for the number of columns setting.
@@ -49,13 +43,6 @@ class SettingsRow(QHBoxLayout):
 
         # Main window
         self.main_window = main_window
-
-        # Max quadrilaterals
-        self.max_label = QLabel("Max Quadrilaterals:")
-        self.max_spin = QSpinBox()
-        self.max_spin.setMinimum(1)
-        self.max_spin.setMaximum(100)
-        self.max_spin.setValue(3)
 
         # Rows
         self.rows_label = QLabel("Rows:")
@@ -75,8 +62,6 @@ class SettingsRow(QHBoxLayout):
         self.check_box = QCheckBox("Display Cells")
 
         # Add widgets to layout
-        self.addWidget(self.max_label)
-        self.addWidget(self.max_spin)
         self.addWidget(self.rows_label)
         self.addWidget(self.rows_spin)
         self.addWidget(self.cols_label)
@@ -84,7 +69,6 @@ class SettingsRow(QHBoxLayout):
         self.addWidget(self.check_box)
 
         # Connect signals to update handler
-        self.max_spin.valueChanged.connect(self.on_settings_changed)
         self.rows_spin.valueChanged.connect(self.on_settings_changed)
         self.cols_spin.valueChanged.connect(self.on_settings_changed)
         self.check_box.stateChanged.connect(self.on_settings_changed)
@@ -95,15 +79,6 @@ class SettingsRow(QHBoxLayout):
         on the main window to update the application state accordingly.
         """
         self.main_window.on_settings_changed()
-
-    def get_nb_max_quadrilateral(self) -> int:
-        """
-        Returns the current value of the maximum number of quadrilaterals as set by the user.
-
-        Returns:
-            int: The value from the max_spin widget representing the maximum number of quadrilaterals.
-        """
-        return self.max_spin.value()
 
     def get_nb_quadrilateral_rows(self) -> int:
         """
