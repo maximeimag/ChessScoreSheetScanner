@@ -34,7 +34,6 @@ class Quadrilateral:
         update_point(point_id, new_point_value): Updates a corner's position if convexity is preserved.
         is_point_in_quadrilateral(point): Checks if a point is inside the quadrilateral (ray casting).
         move_delta(delta): Moves all points by a given delta.
-        get_centroid(): Returns the centroid (geometric center) if drawing is complete.
         update_corner_ids(): Updates logical corner indices based on geometry.
         get_corner(corner_id): Returns the QPointF for a given logical corner index.
         get_top_left(), get_top_right(), get_bottom_left(), get_bottom_right(): Accessors for logical corners.
@@ -49,6 +48,8 @@ class Quadrilateral:
 
     NB_SIDE: int = 4 
     CLOSE_POINT_DISTANCE: int = 10
+
+    ID_DISPLAY_OFFSET: int = -15
 
     COLOR_UNSELECTED_QUADRILATERAL_POINTS: QColor = QColor(255, 255, 255)
     COLOR_UNSELECTED_QUADRILATERAL_ID: QColor = QColor(255, 0, 0)
@@ -244,20 +245,6 @@ class Quadrilateral:
         for i, point in enumerate(self.quadrilateral_points):
             self.update_point(i, point + delta)
 
-    def get_centroid(self) -> QPointF | None:
-        """
-        Calculates and returns the centroid (geometric center) of the quadrilateral.
-        Returns:
-            QPointF | None: The centroid as a QPointF object if the quadrilateral drawing is complete;
-            otherwise, returns None.
-        """
-        if not self.drawing_complete:
-            return None
-
-        cx = sum(pt.x() for pt in self.quadrilateral_points) / self.NB_SIDE
-        cy = sum(pt.y() for pt in self.quadrilateral_points) / self.NB_SIDE
-        return QPointF(cx, cy)
-
     def update_corner_ids(self) -> None:
         """
         Updates the corner IDs (top-left, top-right, bottom-left, bottom-right) of the quadrilateral
@@ -451,13 +438,13 @@ class Quadrilateral:
                 for p1, p2 in internal_cols_list:
                     painter.drawLine(p1, p2)
 
-            # Draw quadrilateral numeral ID at centroid
-            centroid: QPointF = self.get_centroid()
-            if (self.quadrilateral_id is not None) and (centroid is not None):
+            # Draw quadrilateral numeral ID at top left point
+            top_left: QPointF = self.get_top_left() + QPointF(self.ID_DISPLAY_OFFSET, self.ID_DISPLAY_OFFSET)
+            if (self.quadrilateral_id is not None) and (top_left is not None):
                 painter.setPen(
                     self.COLOR_SELECTED_QUADRILATERAL_ID if self.is_selected else self.COLOR_UNSELECTED_QUADRILATERAL_ID
                 )  # Black text for visibility
-                painter.drawText(centroid, str(self.quadrilateral_id + 1))
+                painter.drawText(top_left, str(self.quadrilateral_id + 1))
 
         # Draw unfinished quadrilateral
         else:
