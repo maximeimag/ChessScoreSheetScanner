@@ -321,7 +321,7 @@ class Quadrilateral:
             - The rows are computed by linear interpolation between the top and bottom edges of the quadrilateral.
             - The outermost edges (top and bottom) are not included in the result; only internal rows are returned.
         """
-        # Get points 
+        # Get corners 
         pt_tl: QPointF | None = self.get_top_left()
         pt_tr: QPointF | None = self.get_top_right()
         pt_bl: QPointF | None = self.get_bottom_left()
@@ -337,7 +337,7 @@ class Quadrilateral:
         elif nb_internal_rows == 1:
             return []
 
-        # Draw horizontal grid lines
+        # Get horizontal grid lines
         internal_rows_list: list[list[QPointF]] = []
         for r in range(1, nb_internal_rows):
             t = r / nb_internal_rows
@@ -362,7 +362,7 @@ class Quadrilateral:
             - The columns are interpolated between the top and bottom edges of the quadrilateral.
             - The outermost columns (edges) are not included in the result; only internal columns are returned.
         """
-        # Get points 
+        # Get corners 
         pt_tl: QPointF | None = self.get_top_left()
         pt_tr: QPointF | None = self.get_top_right()
         pt_bl: QPointF | None = self.get_bottom_left()
@@ -378,7 +378,7 @@ class Quadrilateral:
         elif nb_internal_cols == 1:
             return []
 
-        # Draw horizontal grid lines
+        # Get horizontal grid lines
         internal_cols_list: list[list[QPointF]] = []
         for r in range(1, nb_internal_cols):
             t = r / nb_internal_cols
@@ -388,6 +388,62 @@ class Quadrilateral:
             ])
         
         return internal_cols_list
+    
+    def get_internal_cells(self, nb_internal_rows: int, nb_internal_cols: int) -> list[list[list[QPointF]]] | None:
+        """
+        Computes the internal grid cells within the quadrilateral defined by its four corners.
+        This method divides the quadrilateral into a grid of cells, based on the specified number
+        of internal rows and columns. Each cell is represented by a list of four QPointF objects
+        corresponding to its corners (top-left, top-right, bottom-right, bottom-left).
+        Args:
+            nb_internal_rows (int): The number of internal rows to divide the quadrilateral into.
+            nb_internal_cols (int): The number of internal columns to divide the quadrilateral into.
+        Returns:
+            list[list[list[QPointF]]] | None: A 2D list (rows x columns) where each element is a list
+            of four QPointF objects representing the corners of a cell, or None if the quadrilateral
+            corners are not defined or if the number of rows/columns is less than 1.
+        """
+        # Get corners 
+        pt_tl: QPointF | None = self.get_top_left()
+        pt_tr: QPointF | None = self.get_top_right()
+        pt_bl: QPointF | None = self.get_bottom_left()
+        pt_br: QPointF | None = self.get_bottom_right()
+
+        # Check points
+        if (pt_tl is None) or (pt_tr is None) or (pt_bl is None) or (pt_br is None):
+            return None
+        
+        # Check number of rows
+        if nb_internal_rows < 1 or nb_internal_cols < 1:
+            return None
+        
+        # Internal point sub function
+        nb_cells: int = nb_internal_rows * nb_internal_cols
+        get_internal_point = lambda row_id, col_id : (
+            ((nb_internal_rows - row_id) * (nb_internal_cols - col_id) * pt_tl) +
+            ((nb_internal_rows - row_id) * col_id * pt_tr) +
+            (row_id * (nb_internal_cols - col_id) * pt_bl) +
+            (row_id * col_id * pt_br)
+        ) / nb_cells
+
+        # Draw horizontal grid lines
+        internal_cells_array: list[list[list[QPointF]]] = []
+        for row_id in range(nb_internal_rows):
+            # Init row of cells
+            row_cell_list: list[list[QPointF]] = []
+            # Fill row of cells
+            for col_id in range(nb_internal_cols):
+                # Define cell corner
+                cell_tl: QPointF = get_internal_point(row_id=row_id, col_id=col_id)
+                cell_tr: QPointF = get_internal_point(row_id=row_id, col_id=col_id + 1)
+                cell_bl: QPointF = get_internal_point(row_id=row_id + 1, col_id=col_id)
+                cell_br: QPointF = get_internal_point(row_id=row_id + 1, col_id=col_id + 1)
+                # Add cell
+                row_cell_list.append([cell_tl, cell_tr, cell_br, cell_tr])
+            # Append row of cells
+            internal_cells_array.append(row_cell_list)
+            
+        return internal_cells_array
 
     def drawForeground(self, 
             painter: QPainter,
