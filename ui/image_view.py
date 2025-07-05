@@ -1,7 +1,9 @@
+import cv2
 from enum import Enum
+import numpy as np
 
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QMainWindow
-from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor, QWheelEvent, QMouseEvent, QCursor
+from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor, QWheelEvent, QMouseEvent, QCursor, QImage
 from PyQt6.QtCore import Qt, QPointF, QRectF
 
 from ui.utils.Quadrilateral import Quadrilateral
@@ -387,6 +389,65 @@ class ImageView(QGraphicsView):
         
         return close_corner
 
+    def extract_and_resize_cells(self, quadrilateral_id: int, output_size: int = 64) -> list[QPixmap] | None:
+        # Check pixmap and quadrilateral
+        if self.pixmap_item is None or not (0 <= quadrilateral_id < self.get_nb_quadrilateral()):
+            return None
+
+        # Get number of rows and cols
+        nb_rows = self.main_window.settings_row.get_nb_quadrilateral_rows()
+        nb_cols = self.main_window.settings_row.get_nb_quadrilateral_cols()
+
+        # Convert QPixmap to numpy array
+        image: QImage = self.pixmap_item.pixmap().toImage()
+        image = image.convertToFormat(4)  # QImage.Format_RGBA8888
+        width = image.width()
+        height = image.height()
+        ptr = image.bits()
+        ptr.setsize(image.byteCount())
+        arr = np.array(ptr).reshape((height, width, 4))
+
+        # List of Pixmaps
+        cell_pixmaps: list[QPixmap] = []
+
+        for quadrilateral in self.quadrilaterals:
+            # Get internal cells coordinates
+            cells_coordinates_array: list[list[list[QPointF]]] | None = quadrilateral.get_internal_cells_coordinates(
+                nb_internal_rows=nb_rows,
+                nb_internal_cols=nb_cols
+            )
+
+            # Checks if coordinaates are defined
+            if cells_coordinates_array is None:
+                continue
+
+            for cell_col_id in range(nb_cols):
+                for cell_row_id in range(nb_rows):
+                    cell_coordinates_list: list[QPointF] = cells_coordinates_array[cell_row_id][cell_col_id]
+                    
+                    # cell: [tl, tr, br, bl] (should be 4 points)
+                    pts_src = np.array([
+                        [cell_coordinates_list[0].x(), cell_coordinates_list[0].y()],
+                        [cell_coordinates_list[1].x(), cell_coordinates_list[1].y()],
+                        [cell_coordinates_list[2].x(), cell_coordinates_list[2].y()],
+                        [cell_coordinates_list[3].x(), cell_coordinates_list[3].y()]
+                    ], dtype=np.float32)
+                    pts_dst = np.array([
+                        [0, 0],
+                        [output_size - 1, 0],
+                        [output_size - 1, output_size - 1],
+                        [0, output_size - 1]
+                    ], dtype=np.float32)
+                    # Perspective transform
+                    M = cv2.getPerspectiveTransform(pts_src, pts_dst)
+                    warped = cv2.warpPerspective(arr, M, (output_size, output_size))
+                    # Convert back to QPixmap
+                    qimg = QPixmap.fromImage(
+                        QImage(warped.data, output_size, output_size, QImage.Format_RGBA8888)
+                    )
+                    cell_pixmaps.append(qimg)
+
+        return cell_pixmaps
 
     def set_mode(self, target_mode: ButtonRowMode) -> None:
         """

@@ -389,7 +389,7 @@ class Quadrilateral:
         
         return internal_cols_list
     
-    def get_internal_cells(self, nb_internal_rows: int, nb_internal_cols: int) -> list[list[list[QPointF]]] | None:
+    def get_internal_cells_coordinates(self, nb_internal_rows: int, nb_internal_cols: int) -> list[list[list[QPointF]]] | None:
         """
         Computes the internal grid cells within the quadrilateral defined by its four corners.
         This method divides the quadrilateral into a grid of cells, based on the specified number
