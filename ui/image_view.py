@@ -389,9 +389,22 @@ class ImageView(QGraphicsView):
         
         return close_corner
 
-    def extract_and_resize_cells(self, quadrilateral_id: int, output_size: int = 64) -> list[QPixmap] | None:
-        # Check pixmap and quadrilateral
-        if self.pixmap_item is None or not (0 <= quadrilateral_id < self.get_nb_quadrilateral()):
+    def extract_and_resize_cells(self, output_size: int = 64) -> list[QPixmap] | None:
+        """
+        Extracts and resizes the internal cells of a specified quadrilateral region from the displayed image.
+        This method processes the image associated with the current QGraphicsPixmapItem, extracts each internal cell
+        defined by the quadrilateral's grid, applies a perspective transform to each cell to obtain a top-down view,
+        resizes each cell to the specified output size, and returns the results as a list of QPixmap objects.
+        Args:
+            quadrilateral_id (int): The index of the quadrilateral to process.
+            output_size (int, optional): The size (width and height in pixels) to which each cell will be resized.
+                Defaults to 64.
+        Returns:
+            list[QPixmap] | None: A list of QPixmap objects representing the extracted and resized cells,
+                or None if the pixmap is not set or the quadrilateral_id is invalid.
+        """
+        # Check pixmap
+        if self.pixmap_item is None:
             return None
 
         # Get number of rows and cols
@@ -399,16 +412,15 @@ class ImageView(QGraphicsView):
         nb_cols = self.main_window.settings_row.get_nb_quadrilateral_cols()
 
         # Convert QPixmap to numpy array
-        image: QImage = self.pixmap_item.pixmap().toImage()
-        image = image.convertToFormat(4)  # QImage.Format_RGBA8888
-        width = image.width()
-        height = image.height()
-        ptr = image.bits()
-        ptr.setsize(image.byteCount())
-        arr = np.array(ptr).reshape((height, width, 4))
+        qimage: QImage = self.pixmap_item.pixmap().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
+        width = qimage.width()
+        height = qimage.height()
+        ptr = qimage.bits()
+        ptr.setsize(qimage.sizeInBytes())
+        arr = np.frombuffer(ptr, np.uint8).reshape((height, width, 4))
 
         # List of Pixmaps
-        cell_pixmaps: list[QPixmap] = []
+        cell_pixmaps_list: list[QPixmap] = []
 
         for quadrilateral in self.quadrilaterals:
             # Get internal cells coordinates
@@ -442,12 +454,10 @@ class ImageView(QGraphicsView):
                     M = cv2.getPerspectiveTransform(pts_src, pts_dst)
                     warped = cv2.warpPerspective(arr, M, (output_size, output_size))
                     # Convert back to QPixmap
-                    qimg = QPixmap.fromImage(
-                        QImage(warped.data, output_size, output_size, QImage.Format_RGBA8888)
-                    )
-                    cell_pixmaps.append(qimg)
+                    qimg: QPixmap = QPixmap.fromImage(QImage(warped.data, output_size, output_size, QImage.Format.Format_RGBA8888))
+                    cell_pixmaps_list.append(qimg)
 
-        return cell_pixmaps
+        return cell_pixmaps_list
 
     def set_mode(self, target_mode: ButtonRowMode) -> None:
         """
