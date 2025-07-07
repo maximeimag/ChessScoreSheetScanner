@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QSpinBox, QCheckBox, QWidget, QMainWindow
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QSpinBox, QCheckBox, QWidget, QMainWindow, QPushButton
 
 class SettingsRow(QHBoxLayout):
     """
@@ -60,6 +60,10 @@ class SettingsRow(QHBoxLayout):
 
         # Checkable button
         self.check_box = QCheckBox("Display Cells")
+        
+        # Extract Cells button
+        self.extract_cells_button = QPushButton("Extract Cells")
+        self.extract_cells_button.clicked.connect(self.on_extract_cells_clicked)
 
         # Add widgets to layout
         self.addWidget(self.rows_label)
@@ -67,11 +71,18 @@ class SettingsRow(QHBoxLayout):
         self.addWidget(self.cols_label)
         self.addWidget(self.cols_spin)
         self.addWidget(self.check_box)
+        self.addWidget(self.extract_cells_button)
 
         # Connect signals to update handler
         self.rows_spin.valueChanged.connect(self.on_settings_changed)
         self.cols_spin.valueChanged.connect(self.on_settings_changed)
         self.check_box.stateChanged.connect(self.on_settings_changed)
+
+    def on_extract_cells_clicked(self) -> None:
+        """
+        Calls the main window method to display the extracted cells.
+        """
+        self.main_window.update_cell_grid_view()
 
     def on_settings_changed(self) -> None:
         """

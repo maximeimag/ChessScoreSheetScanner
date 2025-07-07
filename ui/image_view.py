@@ -1,7 +1,9 @@
+import cv2
 from enum import Enum
+import numpy as np
 
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QMainWindow
-from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor, QWheelEvent, QMouseEvent, QCursor
+from PyQt6.QtGui import QPixmap, QPainter, QPen, QColor, QWheelEvent, QMouseEvent, QCursor, QImage
 from PyQt6.QtCore import Qt, QPointF, QRectF
 
 from ui.utils.Quadrilateral import Quadrilateral
@@ -387,6 +389,75 @@ class ImageView(QGraphicsView):
         
         return close_corner
 
+    def extract_and_resize_cells(self, output_size: int = 64) -> list[QPixmap] | None:
+        """
+        Extracts and resizes the internal cells of a specified quadrilateral region from the displayed image.
+        This method processes the image associated with the current QGraphicsPixmapItem, extracts each internal cell
+        defined by the quadrilateral's grid, applies a perspective transform to each cell to obtain a top-down view,
+        resizes each cell to the specified output size, and returns the results as a list of QPixmap objects.
+        Args:
+            quadrilateral_id (int): The index of the quadrilateral to process.
+            output_size (int, optional): The size (width and height in pixels) to which each cell will be resized.
+                Defaults to 64.
+        Returns:
+            list[QPixmap] | None: A list of QPixmap objects representing the extracted and resized cells,
+                or None if the pixmap is not set or the quadrilateral_id is invalid.
+        """
+        # Check pixmap
+        if self.pixmap_item is None:
+            return None
+
+        # Get number of rows and cols
+        nb_rows = self.main_window.settings_row.get_nb_quadrilateral_rows()
+        nb_cols = self.main_window.settings_row.get_nb_quadrilateral_cols()
+
+        # Convert QPixmap to numpy array
+        qimage: QImage = self.pixmap_item.pixmap().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
+        width = qimage.width()
+        height = qimage.height()
+        ptr = qimage.bits()
+        ptr.setsize(qimage.sizeInBytes())
+        arr = np.frombuffer(ptr, np.uint8).reshape((height, width, 4))
+
+        # List of Pixmaps
+        cell_pixmaps_list: list[QPixmap] = []
+
+        for quadrilateral in self.quadrilaterals:
+            # Get internal cells coordinates
+            cells_coordinates_array: list[list[list[QPointF]]] | None = quadrilateral.get_internal_cells_coordinates(
+                nb_internal_rows=nb_rows,
+                nb_internal_cols=nb_cols
+            )
+
+            # Checks if coordinaates are defined
+            if cells_coordinates_array is None:
+                continue
+
+            for cell_col_id in range(nb_cols):
+                for cell_row_id in range(nb_rows):
+                    cell_coordinates_list: list[QPointF] = cells_coordinates_array[cell_row_id][cell_col_id]
+                    
+                    # cell: [tl, tr, br, bl] (should be 4 points)
+                    pts_src = np.array([
+                        [cell_coordinates_list[0].x(), cell_coordinates_list[0].y()],
+                        [cell_coordinates_list[1].x(), cell_coordinates_list[1].y()],
+                        [cell_coordinates_list[2].x(), cell_coordinates_list[2].y()],
+                        [cell_coordinates_list[3].x(), cell_coordinates_list[3].y()]
+                    ], dtype=np.float32)
+                    pts_dst = np.array([
+                        [0, 0],
+                        [output_size - 1, 0],
+                        [output_size - 1, output_size - 1],
+                        [0, output_size - 1]
+                    ], dtype=np.float32)
+                    # Perspective transform
+                    M = cv2.getPerspectiveTransform(pts_src, pts_dst)
+                    warped = cv2.warpPerspective(arr, M, (output_size, output_size))
+                    # Convert back to QPixmap
+                    qimg: QPixmap = QPixmap.fromImage(QImage(warped.data, output_size, output_size, QImage.Format.Format_RGBA8888))
+                    cell_pixmaps_list.append(qimg)
+
+        return cell_pixmaps_list
 
     def set_mode(self, target_mode: ButtonRowMode) -> None:
         """

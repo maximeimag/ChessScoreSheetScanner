@@ -8,10 +8,11 @@ from PyQt6.QtCore import QPointF
 from ui.image_view import ImageView
 from ui.button_row import ButtonRow, ButtonRowMode
 from ui.settings_row import SettingsRow
+from ui.cell_grid_view import CellGridView
 
 class MainWindow(QMainWindow):
     """
-    MainWindow is the primary window class for the PyQt6 Image Annotator application.
+    MainWindow is the primary window class for the Chess Score Sheet Scanner application.
     This class manages the main user interface, including the menu bar, image view, 
     settings and button rows, coordinate and zoom labels, and status bar. It provides 
     methods for initializing and updating the UI, handling image loading and closing, 
@@ -23,6 +24,7 @@ class MainWindow(QMainWindow):
         coord_label (QLabel): Label displaying the current mouse coordinates over the image.
         zoom_label (QLabel): Label displaying the current zoom level.
         image_view (ImageView): The widget responsible for displaying and interacting with the image.
+        cell_grid_view (CellGridView): The widget responsible for displaying internal cells
     Methods:
         __init__(): Initializes the main window and its components.
         init_ui(): Sets up the layout, menu bar, and main UI elements.
@@ -32,11 +34,12 @@ class MainWindow(QMainWindow):
         close_image(): Closes the currently displayed image and resets labels.
         reset_labels(): Clears the coordinate and zoom labels.
         update_labels(mouse_position, scale_factor): Updates the coordinate and zoom labels.
+        update_cell_grid_view() : Get internal cells and display in cell_grid_view widget
         on_settings_changed(): Handles updates when application settings are changed.
     """
     def __init__(self):
         """
-        Initializes the main window for the PyQt6 Image Annotator application.
+        Initializes the main window for the Chess Score Sheet Scanner application.
         Sets up the window title and size, initializes the settings and button rows,
         creates labels for coordinates and zoom level, and sets up the image view.
         Finally, calls the method to initialize the user interface.
@@ -44,7 +47,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         # Window initialization
-        self.setWindowTitle("PyQt6 Image Annotator")
+        self.setWindowTitle("Chess Score Sheet Scanner")
         self.resize(1200, 800)
 
         # Quadrilateral settings
@@ -59,6 +62,9 @@ class MainWindow(QMainWindow):
 
         # Image view
         self.image_view: ImageView = ImageView(main_window=self)
+
+        # Cells display
+        self.cell_grid_view: CellGridView = CellGridView(main_window=self)
 
         # Init UI
         self.init_ui()
@@ -82,6 +88,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.image_view)
         main_layout.addWidget(self.coord_label)
         main_layout.addWidget(self.zoom_label)
+        main_layout.addWidget(self.cell_grid_view)
         self.setCentralWidget(central_widget)
         self.setStatusBar(QStatusBar())
 
@@ -160,6 +167,7 @@ class MainWindow(QMainWindow):
         """
         self.reset_labels()
         self.image_view.close_image()
+        self.cell_grid_view.clear()
 
     def reset_labels(self) -> None:
         """
@@ -185,6 +193,26 @@ class MainWindow(QMainWindow):
             self.coord_label.setText(f"{int(mouse_position.x())}, {int(mouse_position.y())} px")
         if scale_factor is not None:
             self.zoom_label.setText(f"{int(scale_factor * 100)} %")
+
+    def update_cell_grid_view(self) -> None:
+        """
+        Updates the cell grid view with the latest extracted and resized cell images.
+        This method retrieves a list of QPixmap objects representing individual cells
+        from the image view. If the extraction fails (returns None), it clears the cell grid view.
+        Otherwise, it displays the extracted cell images in the cell grid view.
+        Returns:
+            None
+        """
+        # Get cells list
+        cell_pixmaps_list: list[QPixmap] | None = self.image_view.extract_and_resize_cells()
+
+        # Clear if list is None
+        if cell_pixmaps_list is None:
+            self.cell_grid_view.clear()
+            return
+        
+        # Display cells
+        self.cell_grid_view.display_cells(cell_pixmap_list=cell_pixmaps_list)
     
     def on_settings_changed(self):
         """
